@@ -28,8 +28,7 @@ image:
   # tag: spark3.5_8-jdk
   pullPolicy: Always
 
-nodeSelector:
-  app: rss
+nodeSelector: {}
 
 # master replicas should not less than 3
 masterReplicas: 3

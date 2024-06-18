@@ -28,12 +28,17 @@ image:
   # tag: spark3.5_8-jdk
   pullPolicy: Always
 
-nodeSelector: {}
+nodeSelectorMaster:
+  app: raycluster
+  "karpenter.sh/capacity-type": on-demand
+
+nodeSelectorWorker:
+  app: rss
 
 # master replicas should not less than 3
-masterReplicas: 3
+masterReplicas: 10
 # worker replicas set on demand, should less than node number
-workerReplicas: 3
+workerReplicas: 20
 hostNetwork: false
 dnsPolicy: ClusterFirst
 securityContext:
@@ -45,18 +50,18 @@ volumes:
     - mountPath: /rss1/rss_ratis/
       hostPath: /local1/rss_ratis
       type: hostPath
-      capacity: 100g
+      capacity: 500g
   worker:
     - mountPath: /rss1/disk1
       hostPath: /local1/disk1
       type: hostPath
       diskType: SSD
-      capacity: 5t
+      capacity: 1t
     - mountPath: /rss2/disk2
       hostPath: /local2/disk2
       type: hostPath
       diskType: SSD
-      capacity: 5t
+      capacity: 1t
 # celeborn configurations      
 celeborn:
   celeborn.master.ha.enabled: true
@@ -64,25 +69,26 @@ celeborn:
   celeborn.master.metrics.prometheus.port: 9098
   celeborn.worker.metrics.prometheus.port: 9096
   celeborn.worker.monitor.disk.enabled: false
-  celeborn.shuffle.chunk.size: 8m
-  celeborn.rpc.io.serverThreads: 64
-  celeborn.rpc.io.numConnectionsPerPeer: 8
-  celeborn.replicate.io.numConnectionsPerPeer: 24
-  celeborn.rpc.io.clientThreads: 64
-  celeborn.rpc.dispatcher.numThreads: 4
+  celeborn.shuffle.chunk.size: 16m
+  celeborn.rpc.io.serverThreads: 512
+  celeborn.rpc.io.numConnectionsPerPeer: 512
+  celeborn.replicate.io.numConnectionsPerPeer: 512
+  celeborn.rpc.io.clientThreads: 512
+  celeborn.rpc.dispatcher.numThreads: 120
   celeborn.worker.flusher.buffer.size: 256K  #128k
   celeborn.worker.flusher.threads: 512
   celeborn.worker.flusher.ssd.threads: 512
-  celeborn.worker.fetch.io.threads: 256
-  celeborn.worker.push.io.threads: 128
+  celeborn.worker.fetch.io.threads: 1024
+  celeborn.worker.push.io.threads: 1024
   celeborn.client.push.stageEnd.timeout: 120s
   celeborn.worker.directMemoryRatioToResume: 0.65
-  celeborn.worker.commitFiles.threads: 128
+  celeborn.worker.commitFiles.threads: 512
+  celeborn.worker.commitFiles.timeout: 240s
 environments:
-  CELEBORN_MASTER_MEMORY: 8g
+  CELEBORN_MASTER_MEMORY: 16g
   CELEBORN_MASTER_JAVA_OPTS: "-XX:-PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -Xloggc:gc-master.out -Dio.netty.leakDetectionLevel=advanced"
-  CELEBORN_WORKER_MEMORY: 8g
-  CELEBORN_WORKER_OFFHEAP_MEMORY: 24g
+  CELEBORN_WORKER_MEMORY: 16g
+  CELEBORN_WORKER_OFFHEAP_MEMORY: 64g
   CELEBORN_WORKER_JAVA_OPTS: "-XX:-PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -Xloggc:gc-worker.out -Dio.netty.leakDetectionLevel=advanced"
   CELEBORN_NO_DAEMONIZE: 1
   TZ: "Australia/Melbourne"
@@ -103,8 +109,29 @@ cluster:
 configmap: celeborn-conf
 
 # resources:
-resources: {}
-podAnnotations: {}
+resources: {
+  master: {
+    requests: {
+      cpu: "16",
+      memory: "64Gi"
+    },
+    limits: {
+      cpu: "16",
+      memory: "64Gi"
+    }
+  },
+  worker: {
+    requests: {
+      cpu: "12",
+      memory: "120Gi"
+    },
+    limits: {
+      cpu: "12",
+      memory: "120Gi"
+    }
+  }
+}
+podAnnotations: { "karpenter.sh/do-not-disrupt": "true"}
 
 affinity:
   master:
@@ -136,5 +163,4 @@ affinity:
                   - worker
           topologyKey: "kubernetes.io/hostname"
 
-tolerations: []
-
+tolerations: [ ]
